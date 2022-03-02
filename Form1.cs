@@ -13,24 +13,23 @@ namespace NavegadorWeb
 {
     public partial class Form1 : Form
     {
+        List<URL> listaHistorial = new List<URL>();
         public Form1()
         {
             InitializeComponent();
         }
-
-        private void retrocederToolStripMenuItem_Click(object sender, EventArgs e)
+        private void Form1_Load(object sender, EventArgs e)
         {
-            webBrowser1.GoBack();
+            webBrowser1.GoHome();
+            leerarchivoTXTparaLista("Historial.txt");
+            LeerListaParaItemsComBox();
         }
-
         private void buttonBuscar_Click(object sender, EventArgs e)
         {
-            // if (comboBoxBuscador.SelectedItem != null)
-            //     webBrowser1.Navigate(new Uri(comboBoxBuscador.SelectedItem.ToString()));
 
             if (comboBoxBuscador.Text.ToString().Contains("https://www.") &&
                comboBoxBuscador.Text.ToString().Contains("."))
-                    webBrowser1.Navigate(new Uri(comboBoxBuscador.SelectedItem.ToString()));
+                    webBrowser1.Navigate(new Uri(comboBoxBuscador.Text));
 
             else if (comboBoxBuscador.Text.ToString().Contains(".")==false)
                     webBrowser1.Navigate(new Uri("https://www.bing.com/search?q=" + comboBoxBuscador.Text.ToString()));
@@ -39,12 +38,76 @@ namespace NavegadorWeb
                     comboBoxBuscador.Text.ToString().Contains("."))
                     webBrowser1.Navigate(new Uri("http://"+comboBoxBuscador.Text.ToString()));
 
-            if(comboBoxBuscador.Items.Contains(comboBoxBuscador.Text)==false)
-                    Almacenar(comboBoxBuscador.Text.ToString());
+            DateTime FechaActual = DateTime.Now;
+            if (comboBoxBuscador.Items.Contains(comboBoxBuscador.Text) == false)
+            {
+                GuardarenLista(comboBoxBuscador.Text, 1,FechaActual);
+            }
+            else
+            {
+                URL uri= listaHistorial.Find(x => x.Direccion == comboBoxBuscador.Text);
+                uri.VecesVisitada += 1;
+                uri.UltimaFechaAccedida = FechaActual;
+                GuardarenTXT();
+            }
 
             comboBoxBuscador.Items.Clear();
-            Leer();
+            LeerListaParaItemsComBox();
 
+        }
+        private void leerarchivoTXTparaLista(string FileName)
+        {
+            FileStream stream = new FileStream(FileName, FileMode.Open, FileAccess.Read);
+            StreamReader leer = new StreamReader(stream);
+            while (leer.Peek() > -1)
+            {
+                URL DatosUri = new URL();
+                DatosUri.Direccion = leer.ReadLine();
+                DatosUri.VecesVisitada = Convert.ToInt16(leer.ReadLine());
+                DatosUri.UltimaFechaAccedida = Convert.ToDateTime(leer.ReadLine());
+                listaHistorial.Add(DatosUri);
+            }
+            leer.Close();
+            stream.Close();
+        }
+        private void LeerListaParaItemsComBox()
+        {
+            foreach (var uri in listaHistorial)
+            {
+                comboBoxBuscador.Items.Add(uri.Direccion);
+            }
+        }
+
+        private void GuardarenLista(string direccion, int vecesVisitdas, DateTime fecha)
+        {
+            URL url = new URL();
+            url.Direccion = direccion;
+            url.VecesVisitada = vecesVisitdas;
+            url.UltimaFechaAccedida = fecha;
+            listaHistorial.Add(url);
+
+            GuardarenTXT();
+        }
+
+        private void GuardarenTXT()
+        {
+            FileStream abrir = new FileStream("Historial.txt", FileMode.OpenOrCreate, FileAccess.Write);
+            StreamWriter escribir = new StreamWriter(abrir);
+
+            foreach (var uri in listaHistorial)
+            {
+                escribir.WriteLine(uri.Direccion);
+                escribir.WriteLine(uri.VecesVisitada);
+                escribir.WriteLine(uri.UltimaFechaAccedida);
+            }
+            escribir.Close();
+            abrir.Close();
+
+        }
+      
+        private void retrocederToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            webBrowser1.GoBack();
         }
 
         private void inicioToolStripMenuItem_Click(object sender, EventArgs e)
@@ -62,42 +125,38 @@ namespace NavegadorWeb
             this.Close();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            //comboBoxBuscador.SelectedIndex = 0;
-            webBrowser1.GoHome();
-            Leer();
-        }
-
-        private void Leer()
-        {
-            string nombreArchivo = "Historial.txt";
-            FileStream abrir = new FileStream(nombreArchivo, FileMode.Open, FileAccess.Read);
-            //(nombre archivo, que queremos hacer, que tipo de acceso tenemos)
-            StreamReader leer = new StreamReader(abrir);
-
-            while (leer.Peek() > -1)
-            {
-                string texto = leer.ReadLine();
-                comboBoxBuscador.Items.Add(texto);
-            }
-            leer.Close();
-        }
-
-        private void Almacenar(String texto)
-        {
-            FileStream abrir = new FileStream("Historial.txt", FileMode.Append, FileAccess.Write);
-            StreamWriter escribir = new StreamWriter(abrir);
-
-            escribir.WriteLine(texto);
-
-            escribir.Close();
-            abrir.Close();
-        }
-
         private void webBrowser1_DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
         {
 
+        }
+
+        private void másVisitadasToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            listaHistorial= listaHistorial.OrderByDescending(x => x.VecesVisitada).ToList();
+            comboBoxBuscador.Items.Clear();
+            LeerListaParaItemsComBox();
+        }
+
+        private void ordenarPorFechaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            listaHistorial = listaHistorial.OrderByDescending(x => x.UltimaFechaAccedida).ToList();
+            comboBoxBuscador.Items.Clear();
+            LeerListaParaItemsComBox();
+        }
+
+        private void eliminarDeHistorialToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (comboBoxBuscador.Items.Contains(comboBoxBuscador.Text))
+            {
+                listaHistorial.RemoveAll(x => x.Direccion == comboBoxBuscador.Text);
+                File.Delete("Historial.txt");
+                GuardarenTXT();
+                comboBoxBuscador.Items.Clear();
+                LeerListaParaItemsComBox();
+                MessageBox.Show("Busqueda eliminada con exito :)");
+            }
+            else
+                MessageBox.Show("Esta busqueda no está almacenada en el historial :\\ ");
         }
     }
 }
